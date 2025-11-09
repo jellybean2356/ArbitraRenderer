@@ -1,70 +1,93 @@
-# ArbitraRenderer (student test project)
+# ArbitraRenderer — learning renderer (student test project)
 
-> Learning renderer built with Rust + wgpu — student test project. Use for inspiration and learning only; not intended as production-quality code or a template for redistribution.
+A compact renderer written in Rust using `wgpu` + `winit`. This repository is a student test project intended for learning and inspiration. It is not production-ready — feel free to read, study, and reuse ideas, but avoid using the code as-is in production.
 
-## What this repository contains
+---
 
-- `engine/` — the single binary crate that implements a tiny renderer using `wgpu` and `winit`.
-  - `engine/src/main.rs` — application entry, `State` lifecycle, render loop and pipeline setup.
-  - `engine/src/shaders/` — WGSL shader(s) included at compile time (e.g. `shader.wgsl`).
-  - `engine/Cargo.toml` — crate manifest and dependency list.
+## Table of contents
 
-This is a student project created for experimenting with GPU rendering concepts. The code intentionally favors clarity and learning over production hardening. Take ideas freely, but don't treat this as a polished library — it's for study and inspiration.
+- [About](#about)
+- [Features](#features)
+- [Project layout](#project-layout)
+- [How it works (high level)](#how-it-works-high-level)
+- [Build & run (Windows PowerShell)](#build--run-windows-powershell)
+- [Development notes & conventions](#development-notes--conventions)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
 
-## High-level overview — how it works
+---
 
-- The app is a single binary in `engine/`. When run it creates a `winit` window and initializes `wgpu`.
-- A `State` struct (in `engine/src/main.rs`) owns the `wgpu::Device`, `Queue`, `Surface`, render pipeline, and GPU buffers. `State::new` performs the synchronous setup (using `pollster::block_on` where needed).
-- Vertex types use `bytemuck` to cast Rust slices safely into GPU buffers. Shaders are stored in `engine/src/shaders/` and loaded with `include_str!("shaders/<file>.wgsl")` so they are compiled into the binary.
-- The render loop is driven by `winit` events. The pipeline expects WGSL entry point names like `vs_main` and `fs_main` (match the existing shaders or update pipeline creation accordingly).
+## About
 
-Key files to inspect when learning:
+This repository contains a single small renderer implemented in the `engine/` crate. The goal is to explore GPU concepts (surfaces, pipelines, vertex buffers, WGSL shaders) with clear, compact code. Expect informal error handling and simplified patterns chosen for clarity rather than robustness.
 
-- `engine/src/main.rs` — lifecycle, pipeline creation, vertex/index buffer setup.
-- `engine/src/shaders/shader.wgsl` — example vertex + fragment shader in WGSL.
-- `engine/Cargo.toml` — dependencies (`wgpu`, `winit`, `bytemuck`, `pollster`, `env_logger`, `anyhow`).
+## Features
+
+- Minimal rendering loop using `winit` and `wgpu`.
+- Example WGSL shader(s) included with the binary via `include_str!(...)`.
+- Simple vertex/index buffer setup and a single render pipeline.
+- Lightweight and easy to read — aimed at learning how the pieces fit together.
+
+## Project layout
+
+- `engine/`
+  - `Cargo.toml` — crate manifest and dependency list.
+  - `src/` — source files: `main.rs`, `renderer.rs`, `vertex.rs`, `camera.rs`, `input.rs` (where present).
+  - `src/shaders/` — WGSL shader files (e.g. `shader.wgsl`).
+
+Open `engine/src/main.rs` to see the app lifecycle and pipeline setup. Shaders live in `engine/src/shaders/` and are compiled into the binary via `include_str!(...)` so editing requires recompilation.
+
+## How it works (high level)
+
+1. The program creates a `winit` window and queries an adapter through `wgpu`.
+2. A `State` struct initializes the device, queue, surface, render pipeline, and GPU buffers.
+3. Vertex data is defined in Rust with `bytemuck` conversions so it can be uploaded to GPU buffers safely.
+4. The render loop listens for `winit` events (resize, input, redraw). On redraw the pipeline draws the configured vertex/index buffers.
+5. Shaders are simple WGSL programs with `vs_main` and `fs_main` entry points — update shader files and corresponding pipeline entry names together.
 
 ## Build & run (Windows PowerShell)
 
-Open PowerShell at the repository root (or inside the `engine/` folder) and run:
+Run from the repository root or from inside the `engine/` folder.
 
 ```powershell
 # From repo root
 cargo run --manifest-path engine/Cargo.toml
 
-# If you want logs (info/debug)
+# Enable runtime logging at info level
 $env:RUST_LOG = "info"; cargo run --manifest-path engine/Cargo.toml
+
+# Build only
+cargo build --manifest-path engine/Cargo.toml
 ```
 
-Notes:
-- The app depends on a working GPU backend (DirectX / Vulkan / Metal depending on platform). On Windows make sure GPU drivers are up to date.
-- `wgpu` selects a surface format from the adapter capabilities — be cautious if you modify color formats.
+Notes
 
-## Development notes and conventions
+- Ensure your GPU drivers are up-to-date. `wgpu` will pick a suitable backend available on the host (DirectX / Vulkan / Metal depending on OS and configuration).
+- Editing shaders requires recompilation because they are included at compile time.
 
-- Shaders are placed in `engine/src/shaders/` and referenced via `include_str!(...)`. Add new WGSL files there and update pipeline entry points if necessary.
-- Vertex data types derive `bytemuck::Pod` + `Zeroable` and are transferred to GPU via `bytemuck::cast_slice(...)`. Keep `Vertex::desc()` in sync with WGSL `@location` attributes.
-- `State::new` currently uses `pollster::block_on` — async wiring is intentionally simple for learning.
-- Error handling in the project is minimal and may use `.unwrap()` in some places — that's a deliberate tradeoff for a teaching project.
+## Development notes & conventions
 
-## Repository housekeeping
+- Shaders: add WGSL shader files under `engine/src/shaders/` and reference them using `include_str!("shaders/<file>.wgsl")`.
+- Vertex layout: keep the Rust `Vertex` struct and its `Vertex::desc()` in sync with the WGSL `@location` attributes.
+- Async setup: `State::new` uses `pollster::block_on` to keep initialization simple. It's fine for a learning project; for production consider a fully async initialization.
+- Error handling: the code may use `unwrap()` in a few places to keep examples concise. Replace with proper error handling for production use.
 
-- Ignore build artifacts — add a `.gitignore` with `/target/` and editor/OS files.
-- For binary projects like this one, keeping `engine/Cargo.lock` committed is recommended for reproducible builds. If you prefer not to track it, add it to `.gitignore` (but note the consequences).
+## Troubleshooting
 
-## License & use
+- Black window / no draw: verify the adapter selection and surface format in `State::new` and ensure the GPU supports the selected features.
+- Compile errors after shader changes: confirm WGSL entry point names (`vs_main`, `fs_main`) and matching attribute locations.
+- On Windows, if `wgpu` fails to initialize, check that your graphics drivers are installed and that any required system dependencies are present.
 
-This repository is a student test project and provided as-is for educational purposes. You may inspect the source and use ideas for learning and personal projects, but:
+## License
 
-- Do not use this repository as-is in production systems.
-- Do not claim this project as your own work if you reuse large portions; provide attribution where appropriate.
-- If secrets or credentials are discovered here (shouldn't be), treat them as compromised and remove/rotate them.
+This project includes an `engine/LICENSE` file (MIT). The code is provided for educational use and inspiration; if you plan to reuse substantial portions, please include attribution.
 
-If you want a license header or an official license file added, say which license you prefer (MIT, Apache-2.0, etc.) and I can add it.
+---
 
-## Quick checklist for pushing to GitHub
+If you'd like, I can also:
 
-1. Add a `.gitignore` at repo root ignoring `/target/`, editor files, OS files and secrets.
-2. Ensure you committed only source files and `engine/Cargo.lock` (if you want reproducible builds).
-3. Run `git status` to verify no large build artifacts are tracked.
-4. Create the repository on GitHub and push your `main` branch.
+- Add a `.gitignore` at the repository root and remove tracked `target/` artifacts.
+- Add short examples or small screenshots (if you can run and capture them).
+- Change the license to another (Apache-2.0, GPL) if you prefer.
+
+Feedback welcome — tell me which follow-up action you'd like next.
