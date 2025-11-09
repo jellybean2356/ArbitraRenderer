@@ -1,4 +1,4 @@
-# ArbitraRenderer — learning renderer (student test project)
+# Arbitra Rendering Engine
 
 A compact renderer written in Rust using `wgpu` + `winit`. This repository is a student test project intended for learning and inspiration. It is not production-ready — feel free to read, study, and reuse ideas, but avoid using the code as-is in production.
 
