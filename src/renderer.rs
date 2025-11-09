@@ -69,7 +69,8 @@ impl State {
         });
 
         // Load the default scene
-        let scene = Scene::load_from_arsc("/assets/scenes/sample.arsc", "/assets")
+        // Use relative paths from current working directory
+        let scene = Scene::load_from_arsc("assets/scenes/sample.arsc", "assets")
             .expect("Failed to load scene");
 
         println!("Scene loaded: '{}' with {} instances", scene.name, scene.instances.len());

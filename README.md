@@ -114,10 +114,13 @@ scale: 1.5 1.5 1.5
 
 ## Build & run (Windows PowerShell)
 
-Run from the repository root.
+**Important**: Always run commands from the `engine/` directory, as the application expects to find the `assets/` folder relative to the current working directory.
 
 ```powershell
-# From repo root
+# Navigate to the engine directory
+cd engine
+
+# Run the application
 cargo run
 
 # Enable runtime logging at info level
