@@ -25,7 +25,7 @@ impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let window = Arc::new(
             event_loop
-                    .create_window(Window::default_attributes())
+                    .create_window(Window::default_attributes().with_title("Arbitra Rendering Engine"))
                     .unwrap(),
         );
 
