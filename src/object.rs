@@ -10,6 +10,7 @@ pub struct ObjectGeometry {
 }
 
 impl ObjectGeometry {
+    // load geometry from .arobj file format
     pub fn load_from_arobj<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
         let content = fs::read_to_string(path.as_ref())?;
         let mut name = String::from("Unnamed");
@@ -60,8 +61,7 @@ impl ObjectGeometry {
                 }
                 _ => {
                     if parsing_vertices && vertices_read < vertex_count {
-                        // Parse vertex with labeled format: position: x y z  color: r g b
-                        // Find position and color values
+                        // parse labeled format: "position: x y z  color: r g b"
                         let mut pos_idx = None;
                         let mut color_idx = None;
                         

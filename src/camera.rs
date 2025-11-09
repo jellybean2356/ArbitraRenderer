@@ -11,8 +11,8 @@ pub struct Camera {
     pub fovy: f32,
     pub znear: f32,
     pub zfar: f32,
-    pub yaw: f32,
-    pub pitch: f32,
+    pub yaw: f32,   // horizontal rotation
+    pub pitch: f32, // vertical rotation
 }
 
 pub struct CameraController {
@@ -20,12 +20,14 @@ pub struct CameraController {
     pub sensitivity: f32,
 }
 
+// camera matrix data sent to GPU
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct CameraUniform {
     pub view_proj: [[f32; 4]; 4],
 }
 
+// converts OpenGL NDC to WGPU NDC (different depth ranges)
 #[rustfmt::skip]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::from_cols(
     cgmath::Vector4::new(1.0, 0.0, 0.0, 0.0),
@@ -66,6 +68,7 @@ impl CameraController {
     pub fn update_camera(&mut self, camera: &mut Camera, input: &mut Input) {
         use cgmath::InnerSpace;
 
+        // process mouse movement
         let (raw_mouse_x, raw_mouse_y) = input.take_mouse_delta();
         let mouse_yaw = raw_mouse_x * self.sensitivity;
         let mouse_pitch = raw_mouse_y * self.sensitivity;
@@ -73,9 +76,10 @@ impl CameraController {
         if mouse_yaw != 0.0 || mouse_pitch != 0.0 {
             camera.yaw += mouse_yaw;
             camera.pitch -= mouse_pitch;
-            camera.pitch = camera.pitch.clamp(-1.5, 1.5);
+            camera.pitch = camera.pitch.clamp(-1.5, 1.5); // prevent camera flip
         }
 
+        // calculate direction vectors from yaw/pitch
         let (yaw_sin, yaw_cos) = camera.yaw.sin_cos();
         let (pitch_sin, pitch_cos) = camera.pitch.sin_cos();
         
@@ -90,6 +94,7 @@ impl CameraController {
 
         camera.target = camera.eye + forward;
 
+        // apply movement inputs
         if input.is_forward_pressed {
             camera.eye += forward * self.speed;
             camera.target += forward * self.speed;

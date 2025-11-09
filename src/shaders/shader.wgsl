@@ -1,10 +1,11 @@
+// camera view-projection matrix (shared across all objects)
 struct CameraUniform {
     view_proj: mat4x4<f32>,
 };
 @group(0) @binding(0)
 var<uniform> camera: CameraUniform;
 
-// Model matrix uniform (bind group 1)
+// per-instance model matrix (object transform)
 struct ModelUniform {
     model: mat4x4<f32>,
 };
@@ -23,7 +24,7 @@ struct VertexOutput {
 @vertex
 fn vs_main(input: VertexInput) -> VertexOutput {
     var output: VertexOutput;
-    // Apply model transform, then camera view-projection
+    // transform: model space -> world space -> clip space
     let world_position = model_uniform.model * vec4<f32>(input.position, 1.0);
     output.clip_position = camera.view_proj * world_position;
 

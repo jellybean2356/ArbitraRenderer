@@ -29,6 +29,7 @@ impl Scene {
         }
     }
 
+    // load scene from .arsc file format
     pub fn load_from_arsc<P: AsRef<Path>>(
         path: P,
         assets_root: &str,
@@ -36,6 +37,7 @@ impl Scene {
         let content = fs::read_to_string(path.as_ref())?;
         let mut scene = Scene::new(String::from("Unnamed Scene"));
         
+        // (geometry_path, instance_name, position, rotation, scale)
         let mut current_object: Option<(String, String, [f32; 3], [f32; 3], [f32; 3])> = None;
 
         for line in content.lines() {
@@ -57,6 +59,7 @@ impl Scene {
                     }
                 }
                 "object" => {
+                    // finalize previous object before starting new one
                     if let Some((geom_path, inst_name, pos, rot, scl)) = current_object.take() {
                         let arobj_path = format!("{}/{}", assets_root, geom_path);
                         let geometry = ObjectGeometry::load_from_arobj(&arobj_path)?;

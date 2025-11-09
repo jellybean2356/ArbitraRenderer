@@ -8,14 +8,14 @@ use crate::camera::{Camera, CameraController, CameraUniform};
 use crate::input::Input;
 use crate::scene::Scene;
 
-/// GPU buffers for a geometry (vertex buffer, index buffer, index count)
+// GPU buffers for a geometry (vertex buffer, index buffer, index count)
 struct GeometryBuffers {
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     num_indices: u32,
 }
 
-/// Per-instance rendering data
+// per-instance data (separate buffers prevent GPU write conflicts)
 struct InstanceData {
     #[allow(dead_code)]
     model_buffer: wgpu::Buffer,
@@ -91,8 +91,8 @@ impl State {
             source: wgpu::ShaderSource::Wgsl(include_str!("shaders/shader.wgsl").into())
         });
 
-        // Load the default scene
-        // Use relative paths from current working directory
+        // load the default scene
+        // use relative paths from current working directory
         let scene = Scene::load_from_arsc("assets/scenes/sample.arsc", "assets")
             .expect("Failed to load scene");
 
@@ -235,7 +235,6 @@ impl State {
         let camera_controller = CameraController::new(0.004);
         let input = Input::new();
         
-        // Create depth texture
         let (depth_texture, depth_texture_view) = Self::create_depth_texture(&device, size.width, size.height);
         
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -246,7 +245,7 @@ impl State {
             depth_stencil: Some(wgpu::DepthStencilState {
                 format: wgpu::TextureFormat::Depth24Plus,
                 depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::Less,
+                depth_compare: wgpu::CompareFunction::Less, // closer objects pass depth test
                 stencil: wgpu::StencilState::default(),
                 bias: wgpu::DepthBiasState::default(),
             }),
@@ -306,7 +305,7 @@ impl State {
         self.size = new_size;
         self.camera.aspect = new_size.width as f32 / new_size.height as f32;
         
-        // Recreate depth texture with new size
+        // recreate depth buffer for new window size
         let (depth_texture, depth_texture_view) = Self::create_depth_texture(&self.device, new_size.width, new_size.height);
         self.depth_texture = depth_texture;
         self.depth_texture_view = depth_texture_view;
@@ -351,7 +350,7 @@ impl State {
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                 view: &self.depth_texture_view,
                 depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(1.0),
+                    load: wgpu::LoadOp::Clear(1.0), // clear to far plane
                     store: wgpu::StoreOp::Store,
                 }),
                 stencil_ops: None,
@@ -363,6 +362,7 @@ impl State {
         renderpass.set_pipeline(&self.render_pipeline);
         renderpass.set_bind_group(0, &self.camera_bind_group, &[]);
 
+        // render each object instance
         let mut rendered_count = 0;
         for (idx, instance) in self.scene.instances.iter().enumerate() {
             if let Some(buffers) = self.geometry_buffers.get(&instance.geometry_name) {
