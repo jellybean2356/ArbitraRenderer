@@ -43,9 +43,32 @@ pub struct State {
     camera_controller: CameraController,
     pub input: Input,
     frame_count: u32,
+    depth_texture: wgpu::Texture,
+    depth_texture_view: wgpu::TextureView,
 }
 
 impl State {
+    fn create_depth_texture(device: &wgpu::Device, width: u32, height: u32) -> (wgpu::Texture, wgpu::TextureView) {
+        let size = wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        };
+        let desc = wgpu::TextureDescriptor {
+            label: Some("depth_texture"),
+            size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Depth24Plus,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        };
+        let texture = device.create_texture(&desc);
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        (texture, view)
+    }
+
     pub async fn new(window: Arc<Window>) -> State {
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
         let adapter = instance
@@ -212,12 +235,21 @@ impl State {
         let camera_controller = CameraController::new(0.004);
         let input = Input::new();
         
+        // Create depth texture
+        let (depth_texture, depth_texture_view) = Self::create_depth_texture(&device, size.width, size.height);
+        
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("render_pipeline"),
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState { module: (&shader), entry_point: (Some("vs_main")), compilation_options: (Default::default()), buffers: (&[Vertex::desc()]) },
-            primitive: wgpu::PrimitiveState {topology: PrimitiveTopology::TriangleList, strip_index_format: None, front_face: wgpu::FrontFace::Ccw, cull_mode: Some(wgpu::Face::Back), unclipped_depth: false, polygon_mode: wgpu::PolygonMode::Fill, conservative: false},
-            depth_stencil: None,
+            primitive: wgpu::PrimitiveState {topology: PrimitiveTopology::TriangleList, strip_index_format: None, front_face: wgpu::FrontFace::Ccw, cull_mode: None, unclipped_depth: false, polygon_mode: wgpu::PolygonMode::Fill, conservative: false},
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: wgpu::TextureFormat::Depth24Plus,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less,
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
             multisample: wgpu::MultisampleState { count: (1), mask: (!0), alpha_to_coverage_enabled: (false) },
             fragment: Some(wgpu::FragmentState {module: &shader, entry_point: Some("fs_main"), compilation_options: Default::default(), targets: &[Some(wgpu::ColorTargetState {format: surface_format, blend: Some(wgpu::BlendState::REPLACE), write_mask: wgpu::ColorWrites::ALL})]}),
             multiview: None,
@@ -243,6 +275,8 @@ impl State {
             camera_controller,
             input,
             frame_count: 0,
+            depth_texture,
+            depth_texture_view,
         };
 
         state.configure_surface();
@@ -271,6 +305,12 @@ impl State {
         }
         self.size = new_size;
         self.camera.aspect = new_size.width as f32 / new_size.height as f32;
+        
+        // Recreate depth texture with new size
+        let (depth_texture, depth_texture_view) = Self::create_depth_texture(&self.device, new_size.width, new_size.height);
+        self.depth_texture = depth_texture;
+        self.depth_texture_view = depth_texture_view;
+        
         self.configure_surface();
     }
 
@@ -308,7 +348,14 @@ impl State {
                     store: wgpu::StoreOp::Store,
                 },
             })],
-            depth_stencil_attachment: None,
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &self.depth_texture_view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
             timestamp_writes: None,
             occlusion_query_set: None,
         });
