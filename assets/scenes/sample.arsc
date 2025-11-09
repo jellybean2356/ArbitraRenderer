@@ -1,0 +1,17 @@
+scene_name Sample Scene
+
+object
+    geometry: objects/cube.arobj
+    name: Cube1
+    position: -0.75 0.0 0.0
+    rotation: 0.0 0.0 0.0
+    scale: 0.7 0.7 0.7
+
+object
+    geometry: objects/cube.arobj
+    name: Cube2
+    position: 0.75 0.5 0.0
+    rotation: 0.0 45.0 0.0
+    scale: 0.7 0.7 0.7
+
+

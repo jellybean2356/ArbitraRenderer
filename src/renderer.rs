@@ -1,10 +1,26 @@
 use std::sync::Arc;
+use std::collections::HashMap;
 use wgpu::{PrimitiveTopology, ShaderModuleDescriptor, util::DeviceExt};
 use winit::window::Window;
 
-use crate::vertex::{Vertex, VERTICES, INDICES};
+use crate::vertex::Vertex;
 use crate::camera::{Camera, CameraController, CameraUniform};
 use crate::input::Input;
+use crate::scene::Scene;
+
+/// GPU buffers for a geometry (vertex buffer, index buffer, index count)
+struct GeometryBuffers {
+    vertex_buffer: wgpu::Buffer,
+    index_buffer: wgpu::Buffer,
+    num_indices: u32,
+}
+
+/// Per-instance rendering data
+struct InstanceData {
+    #[allow(dead_code)]
+    model_buffer: wgpu::Buffer,
+    model_bind_group: wgpu::BindGroup,
+}
 
 pub struct State {
     pub window: Arc<Window>,
@@ -14,15 +30,19 @@ pub struct State {
     surface: wgpu::Surface<'static>,
     surface_format: wgpu::TextureFormat,
     render_pipeline: wgpu::RenderPipeline,
-    index_buffer: wgpu::Buffer,
-    vertex_buffer: wgpu::Buffer,
-    num_indices: u32,
+    scene: Scene,
+    geometry_buffers: HashMap<String, GeometryBuffers>,
+    instance_data: Vec<InstanceData>,
     camera: Camera,
     camera_uniform: CameraUniform,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
+
+    #[allow(dead_code)]
+    model_bind_group_layout: wgpu::BindGroupLayout,
     camera_controller: CameraController,
     pub input: Input,
+    frame_count: u32,
 }
 
 impl State {
@@ -48,19 +68,40 @@ impl State {
             source: wgpu::ShaderSource::Wgsl(include_str!("shaders/shader.wgsl").into())
         });
 
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(VERTICES),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
+        // Load the default scene
+        let scene = Scene::load_from_arsc("/assets/scenes/sample.arsc", "/assets")
+            .expect("Failed to load scene");
 
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(INDICES),
-            usage: wgpu::BufferUsages::INDEX,
-        });
+        println!("Scene loaded: '{}' with {} instances", scene.name, scene.instances.len());
+        for instance in &scene.instances {
+            println!("  - Instance '{}' using geometry '{}'", instance.name, instance.geometry_name);
+        }
 
-        let num_indices = INDICES.len() as u32;
+        let mut geometry_buffers = HashMap::new();
+        for (geom_name, geometry) in &scene.geometries {
+            let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("{} Vertex Buffer", geom_name)),
+                contents: bytemuck::cast_slice(&geometry.vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+
+            let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("{} Index Buffer", geom_name)),
+                contents: bytemuck::cast_slice(&geometry.indices),
+                usage: wgpu::BufferUsages::INDEX,
+            });
+
+            let num_indices = geometry.indices.len() as u32;
+
+            geometry_buffers.insert(
+                geom_name.clone(),
+                GeometryBuffers {
+                    vertex_buffer,
+                    index_buffer,
+                    num_indices,
+                },
+            );
+        }
 
         let camera = Camera {
             eye: (0.0, 1.0, 2.0).into(),
@@ -112,11 +153,56 @@ impl State {
             label: Some("camera_bind_group")
         });
 
+        let model_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }
+            ],
+            label: Some("model_bind_group_layout")
+        });
+
+        let mut instance_data = Vec::new();
+        for instance in &scene.instances {
+            let model_matrix = instance.transform.to_matrix();
+            let model_matrix_array: &[f32; 16] = model_matrix.as_ref();
+            
+            let model_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("model_buffer_{}", instance.name)),
+                contents: bytemuck::cast_slice(model_matrix_array),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            });
+
+            let model_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &model_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: model_buffer.as_entire_binding(),
+                    }
+                ],
+                label: Some(&format!("model_bind_group_{}", instance.name)),
+            });
+
+            instance_data.push(InstanceData {
+                model_buffer,
+                model_bind_group,
+            });
+        }
+
         let render_pipeline_layout = device.create_pipeline_layout(
             &wgpu::PipelineLayoutDescriptor {
                 label: Some("render_pipeline_layout"),
                 bind_group_layouts: &[
                     &camera_bind_group_layout,
+                    &model_bind_group_layout,
                 ],
                 push_constant_ranges: &[],
             }
@@ -145,15 +231,17 @@ impl State {
             surface,
             surface_format,
             render_pipeline,
-            index_buffer,
-            vertex_buffer,
-            num_indices,
+            scene,
+            geometry_buffers,
+            instance_data,
             camera,
             camera_uniform,
             camera_buffer,
             camera_bind_group,
+            model_bind_group_layout,
             camera_controller,
             input,
+            frame_count: 0,
         };
 
         state.configure_surface();
@@ -224,12 +312,26 @@ impl State {
             occlusion_query_set: None,
         });
 
-        // render commands go here
         renderpass.set_pipeline(&self.render_pipeline);
         renderpass.set_bind_group(0, &self.camera_bind_group, &[]);
-        renderpass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        renderpass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-        renderpass.draw_indexed(0..self.num_indices, 0, 0..1);
+
+        let mut rendered_count = 0;
+        for (idx, instance) in self.scene.instances.iter().enumerate() {
+            if let Some(buffers) = self.geometry_buffers.get(&instance.geometry_name) {
+                if let Some(instance_data) = self.instance_data.get(idx) {
+                    renderpass.set_bind_group(1, &instance_data.model_bind_group, &[]);
+                    renderpass.set_vertex_buffer(0, buffers.vertex_buffer.slice(..));
+                    renderpass.set_index_buffer(buffers.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+                    renderpass.draw_indexed(0..buffers.num_indices, 0, 0..1);
+                    rendered_count += 1;
+                }
+            }
+        }
+        
+        if self.frame_count == 0 {
+            println!("First frame: rendered {} instances out of {} total", rendered_count, self.scene.instances.len());
+        }
+        self.frame_count += 1;
 
         drop(renderpass);
 

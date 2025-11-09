@@ -2,6 +2,9 @@ mod vertex;
 mod renderer;
 mod input;
 mod camera;
+mod transform;
+mod object;
+mod scene;
 
 use std::sync::Arc;
 use winit::{
