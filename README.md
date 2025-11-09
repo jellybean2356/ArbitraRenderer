@@ -19,7 +19,7 @@ A compact renderer written in Rust using `wgpu` + `winit`. This repository is a 
 
 ## About
 
-This repository contains a single small renderer implemented in the `engine/` crate. The goal is to explore GPU concepts (surfaces, pipelines, vertex buffers, WGSL shaders) with clear, compact code. Expect informal error handling and simplified patterns chosen for clarity rather than robustness.
+This repository contains a single small rendering engine made in rust. The goal is to explore GPU concepts (surfaces, pipelines, vertex buffers, WGSL shaders) with clear, compact code. Expect informal error handling and simplified patterns chosen for clarity rather than robustness.
 
 ## Features
 
@@ -30,12 +30,12 @@ This repository contains a single small renderer implemented in the `engine/` cr
 
 ## Project layout
 
-- `engine/`
+- `root/`
   - `Cargo.toml` — crate manifest and dependency list.
   - `src/` — source files: `main.rs`, `renderer.rs`, `vertex.rs`, `camera.rs`, `input.rs` (where present).
   - `src/shaders/` — WGSL shader files (e.g. `shader.wgsl`).
 
-Open `engine/src/main.rs` to see the app lifecycle and pipeline setup. Shaders live in `engine/src/shaders/` and are compiled into the binary via `include_str!(...)` so editing requires recompilation.
+Open `/src/main.rs` to see the app lifecycle and pipeline setup. Shaders live in `/src/shaders/` and are compiled into the binary via `include_str!(...)` so editing requires recompilation.
 
 ## How it works (high level)
 
@@ -47,17 +47,17 @@ Open `engine/src/main.rs` to see the app lifecycle and pipeline setup. Shaders l
 
 ## Build & run (Windows PowerShell)
 
-Run from the repository root or from inside the `engine/` folder.
+Run from the repository root.
 
 ```powershell
 # From repo root
-cargo run --manifest-path engine/Cargo.toml
+cargo run
 
 # Enable runtime logging at info level
-$env:RUST_LOG = "info"; cargo run --manifest-path engine/Cargo.toml
+$env:RUST_LOG = "info"; cargo run
 
 # Build only
-cargo build --manifest-path engine/Cargo.toml
+cargo build
 ```
 
 Notes
@@ -80,14 +80,4 @@ Notes
 
 ## License
 
-This project includes an `engine/LICENSE` file (MIT). The code is provided for educational use and inspiration; if you plan to reuse substantial portions, please include attribution.
-
----
-
-If you'd like, I can also:
-
-- Add a `.gitignore` at the repository root and remove tracked `target/` artifacts.
-- Add short examples or small screenshots (if you can run and capture them).
-- Change the license to another (Apache-2.0, GPL) if you prefer.
-
-Feedback welcome — tell me which follow-up action you'd like next.
+This project includes an `/LICENSE` file (MIT). The code is provided for educational use and inspiration; if you plan to reuse substantial portions, please include attribution.
