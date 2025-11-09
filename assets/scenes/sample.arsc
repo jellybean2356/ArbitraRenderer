@@ -1,17 +1,59 @@
 scene_name Sample Scene
 
+# Ground plane
 object
-    geometry: objects/cube.arobj
-    name: Cube1
-    position: -0.75 0.0 0.0
+    geometry: objects/plane.arobj
+    name: Ground
+    position: 0.0 -1.0 0.0
     rotation: 0.0 0.0 0.0
-    scale: 0.7 0.7 0.7
+    scale: 3.0 1.0 3.0
 
+# Central pyramid
+object
+    geometry: objects/pyramid.arobj
+    name: CentralPyramid
+    position: 0.0 0.0 0.0
+    rotation: 0.0 0.0 0.0
+    scale: 1.0 1.0 1.0
+
+# Left cube
 object
     geometry: objects/cube.arobj
-    name: Cube2
-    position: 0.75 0.5 0.0
+    name: LeftCube
+    position: -1.5 -0.5 0.0
+    rotation: 0.0 15.0 0.0
+    scale: 0.5 0.5 0.5
+
+# Right cube
+object
+    geometry: objects/cube.arobj
+    name: RightCube
+    position: 1.5 -0.5 0.0
+    rotation: 0.0 -15.0 0.0
+    scale: 0.5 0.5 0.5
+
+# Back pyramid (smaller)
+object
+    geometry: objects/pyramid.arobj
+    name: BackPyramid
+    position: 0.0 -0.5 -2.0
     rotation: 0.0 45.0 0.0
-    scale: 0.7 0.7 0.7
+    scale: 0.6 0.6 0.6
+
+# Front left cube (rotated)
+object
+    geometry: objects/cube.arobj
+    name: FrontLeftCube
+    position: -1.0 -0.3 1.5
+    rotation: 45.0 45.0 0.0
+    scale: 0.4 0.4 0.4
+
+# Front right cube (rotated)
+object
+    geometry: objects/cube.arobj
+    name: FrontRightCube
+    position: 1.0 -0.3 1.5
+    rotation: -45.0 -45.0 0.0
+    scale: 0.4 0.4 0.4
 
 
