@@ -1,24 +1,2 @@
 name Pyramid
-
-vertices 16
-    position:  0.0  0.5  0.0    color: 1.0 1.0 0.0    normal:  0.0  0.4472  0.8944
-    position: -0.5 -0.5  0.5    color: 1.0 0.0 0.0    normal:  0.0  0.4472  0.8944
-    position:  0.5 -0.5  0.5    color: 0.0 1.0 0.0    normal:  0.0  0.4472  0.8944
-    position:  0.0  0.5  0.0    color: 1.0 1.0 0.0    normal:  0.8944  0.4472  0.0
-    position:  0.5 -0.5  0.5    color: 0.0 1.0 0.0    normal:  0.8944  0.4472  0.0
-    position:  0.5 -0.5 -0.5    color: 0.0 0.0 1.0    normal:  0.8944  0.4472  0.0
-    position:  0.0  0.5  0.0    color: 1.0 1.0 0.0    normal:  0.0  0.4472 -0.8944
-    position:  0.5 -0.5 -0.5    color: 0.0 0.0 1.0    normal:  0.0  0.4472 -0.8944
-    position: -0.5 -0.5 -0.5    color: 1.0 0.0 1.0    normal:  0.0  0.4472 -0.8944
-    position:  0.0  0.5  0.0    color: 1.0 1.0 0.0    normal: -0.8944  0.4472  0.0
-    position: -0.5 -0.5 -0.5    color: 1.0 0.0 1.0    normal: -0.8944  0.4472  0.0
-    position: -0.5 -0.5  0.5    color: 1.0 0.0 0.0    normal: -0.8944  0.4472  0.0
-    position: -0.5 -0.5  0.5    color: 1.0 0.0 0.0    normal:  0.0 -1.0  0.0
-    position: -0.5 -0.5 -0.5    color: 1.0 0.0 1.0    normal:  0.0 -1.0  0.0
-    position:  0.5 -0.5 -0.5    color: 0.0 0.0 1.0    normal:  0.0 -1.0  0.0
-    position:  0.5 -0.5  0.5    color: 0.0 1.0 0.0    normal:  0.0 -1.0  0.0
-
-indices 18
-    0 1 2    3 4 5
-    6 7 8    9 10 11
-    12 13 14 14 15 12
+obj_file: models/pyramid.obj
