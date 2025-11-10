@@ -61,20 +61,23 @@ impl ObjectGeometry {
                 }
                 _ => {
                     if parsing_vertices && vertices_read < vertex_count {
-                        // parse labeled format: "position: x y z  color: r g b"
+                        // parse labeled format: "position: x y z  color: r g b  normal: x y z"
                         let mut pos_idx = None;
                         let mut color_idx = None;
+                        let mut normal_idx = None;
                         
                         for (i, part) in parts.iter().enumerate() {
                             if *part == "position:" {
                                 pos_idx = Some(i + 1);
                             } else if *part == "color:" {
                                 color_idx = Some(i + 1);
+                            } else if *part == "normal:" {
+                                normal_idx = Some(i + 1);
                             }
                         }
                         
-                        if let (Some(pi), Some(ci)) = (pos_idx, color_idx) {
-                            if ci >= pi + 3 && parts.len() >= ci + 3 {
+                        if let (Some(pi), Some(ci), Some(ni)) = (pos_idx, color_idx, normal_idx) {
+                            if parts.len() >= ni + 3 {
                                 let position = [
                                     parts[pi].parse()?,
                                     parts[pi + 1].parse()?,
@@ -85,7 +88,12 @@ impl ObjectGeometry {
                                     parts[ci + 1].parse()?,
                                     parts[ci + 2].parse()?,
                                 ];
-                                vertices.push(Vertex { position, color });
+                                let normal = [
+                                    parts[ni].parse()?,
+                                    parts[ni + 1].parse()?,
+                                    parts[ni + 2].parse()?,
+                                ];
+                                vertices.push(Vertex { position, color, normal });
                                 vertices_read += 1;
                             }
                         }
@@ -101,6 +109,11 @@ impl ObjectGeometry {
                     }
                 }
             }
+        }
+
+        // debug: print first vertex to verify normals are loaded
+        if let Some(first_vert) = vertices.first() {
+            println!("Loaded '{}': first vertex normal = {:?}", name, first_vert.normal);
         }
 
         Ok(ObjectGeometry {

@@ -7,6 +7,7 @@ use bytemuck;
 pub struct Vertex {
     pub position: [f32; 3],
     pub color: [f32; 3],
+    pub normal: [f32; 3],
 }
 
 impl Vertex {
@@ -18,12 +19,17 @@ impl Vertex {
             attributes: &[
                 wgpu::VertexAttribute {
                     offset: 0,
-                    shader_location: 0, // @location(0) in shader
+                    shader_location: 0, // @location(0) in shader - position
                     format: wgpu::VertexFormat::Float32x3,
                 },
                 wgpu::VertexAttribute {
                     offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
-                    shader_location: 1, // @location(1) in shader
+                    shader_location: 1, // @location(1) in shader - color
+                    format: wgpu::VertexFormat::Float32x3,
+                },
+                wgpu::VertexAttribute {
+                    offset: std::mem::size_of::<[f32; 6]>() as wgpu::BufferAddress,
+                    shader_location: 2, // @location(2) in shader - normal
                     format: wgpu::VertexFormat::Float32x3,
                 },
             ],

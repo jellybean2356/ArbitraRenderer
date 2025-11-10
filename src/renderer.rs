@@ -8,6 +8,49 @@ use crate::camera::{Camera, CameraController, CameraUniform};
 use crate::input::Input;
 use crate::scene::Scene;
 
+const MAX_POINT_LIGHTS: usize = 8;
+
+// single point light (position + color + intensity)
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct PointLight {
+    position: [f32; 3],
+    intensity: f32,
+    color: [f32; 3],
+    _padding: f32,
+}
+
+// all point lights + count
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct PointLightsUniform {
+    lights: [PointLight; MAX_POINT_LIGHTS],
+    count: u32,
+    _padding: [f32; 3],
+}
+
+// global directional light data sent to GPU
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct LightUniform {
+    direction: [f32; 3],
+    _padding1: f32,
+    color: [f32; 3],
+    _padding2: f32,
+    intensity: f32,
+    ambient_strength: f32,
+    _padding3: [f32; 2],
+}
+
+// per-instance model matrix + emissive strength
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct ModelUniform {
+    model: [[f32; 4]; 4],
+    emissive: f32,
+    _padding: [f32; 3],
+}
+
 // GPU buffers for a geometry (vertex buffer, index buffer, index count)
 struct GeometryBuffers {
     vertex_buffer: wgpu::Buffer,
@@ -37,6 +80,14 @@ pub struct State {
     camera_uniform: CameraUniform,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
+
+    #[allow(dead_code)]
+    light_buffer: wgpu::Buffer,
+    light_bind_group: wgpu::BindGroup,
+
+    #[allow(dead_code)]
+    point_lights_buffer: wgpu::Buffer,
+    point_lights_bind_group: wgpu::BindGroup,
 
     #[allow(dead_code)]
     model_bind_group_layout: wgpu::BindGroupLayout,
@@ -177,11 +228,135 @@ impl State {
             label: Some("camera_bind_group")
         });
 
+        // create light uniform from scene
+        println!("Light settings:");
+        println!("  Direction: {:?}", scene.light.direction);
+        println!("  Color: {:?}", scene.light.color);
+        println!("  Intensity: {}", scene.light.intensity);
+        println!("  Ambient: {}", scene.light.ambient_strength);
+        
+        let light_uniform = LightUniform {
+            direction: scene.light.direction,
+            _padding1: 0.0,
+            color: scene.light.color,
+            _padding2: 0.0,
+            intensity: scene.light.intensity,
+            ambient_strength: scene.light.ambient_strength,
+            _padding3: [0.0; 2],
+        };
+
+        let light_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("light_buffer"),
+            contents: bytemuck::cast_slice(&[light_uniform]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let light_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }
+            ],
+            label: Some("light_bind_group_layout")
+        });
+
+        let light_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &light_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: light_buffer.as_entire_binding(),
+                }
+            ],
+            label: Some("light_bind_group")
+        });
+
+        // collect point lights from emissive objects
+        let mut point_lights = [PointLight {
+            position: [0.0; 3],
+            intensity: 0.0,
+            color: [0.0; 3],
+            _padding: 0.0,
+        }; MAX_POINT_LIGHTS];
+        
+        let mut point_light_count = 0;
+        for instance in &scene.instances {
+            if instance.emissive > 0.0 && point_light_count < MAX_POINT_LIGHTS {
+                // get average color of the object's geometry
+                let geom = scene.geometries.get(&instance.geometry_name);
+                let color = if let Some(g) = geom {
+                    if let Some(first_vert) = g.vertices.first() {
+                        first_vert.color
+                    } else {
+                        [1.0, 1.0, 1.0]
+                    }
+                } else {
+                    [1.0, 1.0, 1.0]
+                };
+                
+                point_lights[point_light_count] = PointLight {
+                    position: instance.transform.position,
+                    intensity: instance.emissive * 5.0,  // scale up for visibility
+                    color,
+                    _padding: 0.0,
+                };
+                point_light_count += 1;
+                println!("Point light {} at {:?} with color {:?}, intensity {}", 
+                    point_light_count, instance.transform.position, color, instance.emissive * 5.0);
+            }
+        }
+        
+        let point_lights_uniform = PointLightsUniform {
+            lights: point_lights,
+            count: point_light_count as u32,
+            _padding: [0.0; 3],
+        };
+        
+        let point_lights_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("point_lights_buffer"),
+            contents: bytemuck::cast_slice(&[point_lights_uniform]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let point_lights_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }
+            ],
+            label: Some("point_lights_bind_group_layout")
+        });
+
+        let point_lights_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &point_lights_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: point_lights_buffer.as_entire_binding(),
+                }
+            ],
+            label: Some("point_lights_bind_group")
+        });
+
         let model_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
+                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -198,9 +373,24 @@ impl State {
             let model_matrix = instance.transform.to_matrix();
             let model_matrix_array: &[f32; 16] = model_matrix.as_ref();
             
+            let model_uniform = ModelUniform {
+                model: [
+                    [model_matrix_array[0], model_matrix_array[1], model_matrix_array[2], model_matrix_array[3]],
+                    [model_matrix_array[4], model_matrix_array[5], model_matrix_array[6], model_matrix_array[7]],
+                    [model_matrix_array[8], model_matrix_array[9], model_matrix_array[10], model_matrix_array[11]],
+                    [model_matrix_array[12], model_matrix_array[13], model_matrix_array[14], model_matrix_array[15]],
+                ],
+                emissive: instance.emissive,
+                _padding: [0.0; 3],
+            };
+            
+            if instance.emissive > 0.0 {
+                println!("Object '{}' has emissive: {}", instance.name, instance.emissive);
+            }
+
             let model_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some(&format!("model_buffer_{}", instance.name)),
-                contents: bytemuck::cast_slice(model_matrix_array),
+                contents: bytemuck::cast_slice(&[model_uniform]),
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             });
 
@@ -227,6 +417,8 @@ impl State {
                 bind_group_layouts: &[
                     &camera_bind_group_layout,
                     &model_bind_group_layout,
+                    &light_bind_group_layout,
+                    &point_lights_bind_group_layout,
                 ],
                 push_constant_ranges: &[],
             }
@@ -270,6 +462,10 @@ impl State {
             camera_uniform,
             camera_buffer,
             camera_bind_group,
+            light_buffer,
+            light_bind_group,
+            point_lights_buffer,
+            point_lights_bind_group,
             model_bind_group_layout,
             camera_controller,
             input,
@@ -361,6 +557,8 @@ impl State {
 
         renderpass.set_pipeline(&self.render_pipeline);
         renderpass.set_bind_group(0, &self.camera_bind_group, &[]);
+        renderpass.set_bind_group(2, &self.light_bind_group, &[]);
+        renderpass.set_bind_group(3, &self.point_lights_bind_group, &[]);
 
         // render each object instance
         let mut rendered_count = 0;

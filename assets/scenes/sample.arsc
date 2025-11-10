@@ -1,5 +1,10 @@
 scene_name Sample Scene
 
+light_direction: -0.5 -1.0 -0.3
+light_color: 1.0 0.95 0.9
+light_intensity: 0.8
+ambient_strength: 0.1
+
 # Ground plane
 object
     geometry: objects/plane.arobj
@@ -8,13 +13,14 @@ object
     rotation: 0.0 0.0 0.0
     scale: 3.0 1.0 3.0
 
-# Central pyramid
+# Central pyramid (glowing!)
 object
     geometry: objects/pyramid.arobj
     name: CentralPyramid
     position: 0.0 0.0 0.0
     rotation: 0.0 0.0 0.0
     scale: 1.0 1.0 1.0
+    emissive: 0.5
 
 # Left cube
 object
