@@ -5,6 +5,8 @@ mod camera;
 mod transform;
 mod object;
 mod scene;
+mod material;
+mod texture;
 
 use std::sync::Arc;
 use winit::{

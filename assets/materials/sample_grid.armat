@@ -1,0 +1,4 @@
+name SampleGrid
+albedo_texture: textures/sample_grid.png
+roughness: 0.8
+metallic: 0.0

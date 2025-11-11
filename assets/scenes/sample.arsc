@@ -1,9 +1,9 @@
 scene_name Sample Scene
 
 light_direction: -0.5 -1.0 -0.3
-light_color: 1.0 0.95 0.9
-light_intensity: 0.8
-ambient_strength: 0.1
+light_color: 0.3 0.3 0.4
+light_intensity: 0.2
+ambient_strength: 0.02
 
 # Ground plane
 object
@@ -12,15 +12,18 @@ object
     position: 0.0 -1.0 0.0
     rotation: 0.0 0.0 0.0
     scale: 3.0 1.0 3.0
+    material: materials/sample_grid.armat
 
-# Central pyramid (glowing!)
+# Central pyramid (glowing bright!)
 object
     geometry: objects/pyramid.arobj
     name: CentralPyramid
     position: 0.0 0.0 0.0
     rotation: 0.0 0.0 0.0
     scale: 1.0 1.0 1.0
-    emissive: 0.5
+    emissive: 2.0
+    emissive_color: 1.0 0.3 0.3
+    material: materials/red.armat
 
 # Left cube
 object
@@ -29,6 +32,7 @@ object
     position: -1.5 -0.5 0.0
     rotation: 0.0 15.0 0.0
     scale: 0.5 0.5 0.5
+    material: materials/white.armat
 
 # Right cube
 object
@@ -37,14 +41,18 @@ object
     position: 1.5 -0.5 0.0
     rotation: 0.0 -15.0 0.0
     scale: 0.5 0.5 0.5
+    material: materials/white.armat
 
-# Back pyramid (smaller)
+# Back pyramid (glowing!)
 object
     geometry: objects/pyramid.arobj
     name: BackPyramid
     position: 0.0 -0.5 -2.0
     rotation: 0.0 45.0 0.0
     scale: 0.6 0.6 0.6
+    emissive: 1.5
+    emissive_color: 0.3 1.0 0.3
+    material: materials/green.armat
 
 # Front left cube (rotated)
 object
@@ -53,6 +61,7 @@ object
     position: -1.0 -0.3 1.5
     rotation: 45.0 45.0 0.0
     scale: 0.4 0.4 0.4
+    material: materials/checkerboard.armat
 
 # Front right cube (rotated)
 object
@@ -61,5 +70,4 @@ object
     position: 1.0 -0.3 1.5
     rotation: -45.0 -45.0 0.0
     scale: 0.4 0.4 0.4
-
-
+    material: materials/checkerboard.armat

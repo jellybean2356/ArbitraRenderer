@@ -1,4 +1,5 @@
 use crate::object::ObjectGeometry;
+use crate::material::Material;
 use crate::transform::Transform;
 use std::collections::HashMap;
 use std::fs;
@@ -30,7 +31,9 @@ pub struct ObjectInstance {
     pub name: String,
     pub geometry_name: String,
     pub transform: Transform,
-    pub emissive: f32,  // glow strength (0.0 = no glow, >0 = glows)
+    pub emissive: f32,
+    pub emissive_color: [f32; 3],
+    pub material: Material,
 }
 
 #[derive(Debug)]
@@ -60,8 +63,8 @@ impl Scene {
         let content = fs::read_to_string(path.as_ref())?;
         let mut scene = Scene::new(String::from("Unnamed Scene"));
         
-        // (geometry_path, instance_name, position, rotation, scale, emissive)
-        let mut current_object: Option<(String, String, [f32; 3], [f32; 3], [f32; 3], f32)> = None;
+        // (geometry_path, instance_name, position, rotation, scale, emissive, emissive_color, material_path)
+        let mut current_object: Option<(String, String, [f32; 3], [f32; 3], [f32; 3], f32, [f32; 3], Option<String>)> = None;
 
         for line in content.lines() {
             let line = line.trim();
@@ -114,11 +117,21 @@ impl Scene {
                 }
                 "object" => {
                     // finalize previous object before starting new one
-                    if let Some((geom_path, inst_name, pos, rot, scl, emis)) = current_object.take() {
+                    if let Some((geom_path, inst_name, pos, rot, scl, emis, emis_color, mat_path)) = current_object.take() {
                         let arobj_path = format!("{}/{}", assets_root, geom_path);
                         let geometry = ObjectGeometry::load_from_arobj(&arobj_path)?;
                         let geometry_name = geometry.name.clone();
                         scene.geometries.entry(geometry_name.clone()).or_insert(geometry);
+                        
+                        let material = if let Some(mat) = mat_path {
+                            let material_path = format!("{}/{}", assets_root, mat);
+                            Material::from_file(&material_path).unwrap_or_else(|e| {
+                                eprintln!("Failed to load material: {}. Using default.", e);
+                                Material::default()
+                            })
+                        } else {
+                            Material::default()
+                        };
                         
                         let instance = ObjectInstance {
                             name: inst_name.clone(),
@@ -129,6 +142,8 @@ impl Scene {
                                 scale: scl,
                             },
                             emissive: emis,
+                            emissive_color: emis_color,
+                            material,
                         };
                         println!("Loaded instance '{}' referencing geometry '{}' at position {:?}", 
                             inst_name, geometry_name, pos);
@@ -140,7 +155,9 @@ impl Scene {
                         [0.0, 0.0, 0.0],
                         [0.0, 0.0, 0.0],
                         [1.0, 1.0, 1.0],
-                        0.0,  // emissive default
+                        0.0,
+                        [1.0, 1.0, 1.0],
+                        None,
                     ));
                 }
                 "geometry:" => {
@@ -197,15 +214,43 @@ impl Scene {
                         }
                     }
                 }
+                "emissive_color:" => {
+                    if let Some(ref mut obj) = current_object {
+                        if parts.len() >= 4 {
+                            obj.6 = [
+                                parts[1].parse()?,
+                                parts[2].parse()?,
+                                parts[3].parse()?,
+                            ];
+                        }
+                    }
+                }
+                "material:" => {
+                    if let Some(ref mut obj) = current_object {
+                        if parts.len() >= 2 {
+                            obj.7 = Some(parts[1].to_string());
+                        }
+                    }
+                }
                 _ => {}
             }
         }
         
-        if let Some((geom_path, inst_name, pos, rot, scl, emis)) = current_object.take() {
+        if let Some((geom_path, inst_name, pos, rot, scl, emis, emis_color, mat_path)) = current_object.take() {
             let arobj_path = format!("{}/{}", assets_root, geom_path);
             let geometry = ObjectGeometry::load_from_arobj(&arobj_path)?;
             let geometry_name = geometry.name.clone();
             scene.geometries.entry(geometry_name.clone()).or_insert(geometry);
+            
+            let material = if let Some(mat) = mat_path {
+                let material_path = format!("{}/{}", assets_root, mat);
+                Material::from_file(&material_path).unwrap_or_else(|e| {
+                    eprintln!("Failed to load material: {}. Using default.", e);
+                    Material::default()
+                })
+            } else {
+                Material::default()
+            };
             
             let instance = ObjectInstance {
                 name: inst_name.clone(),
@@ -216,6 +261,8 @@ impl Scene {
                     scale: scl,
                 },
                 emissive: emis,
+                emissive_color: emis_color,
+                material,
             };
             println!("Loaded instance '{}' referencing geometry '{}' at position {:?}", 
                 inst_name, geometry_name, pos);

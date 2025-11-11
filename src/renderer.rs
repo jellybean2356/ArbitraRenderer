@@ -7,6 +7,7 @@ use crate::vertex::Vertex;
 use crate::camera::{Camera, CameraController, CameraUniform};
 use crate::input::Input;
 use crate::scene::Scene;
+use crate::texture::Texture;
 
 const MAX_POINT_LIGHTS: usize = 8;
 
@@ -63,6 +64,7 @@ struct InstanceData {
     #[allow(dead_code)]
     model_buffer: wgpu::Buffer,
     model_bind_group: wgpu::BindGroup,
+    texture_bind_group: wgpu::BindGroup,
 }
 
 pub struct State {
@@ -83,11 +85,9 @@ pub struct State {
 
     #[allow(dead_code)]
     light_buffer: wgpu::Buffer,
-    light_bind_group: wgpu::BindGroup,
-
     #[allow(dead_code)]
     point_lights_buffer: wgpu::Buffer,
-    point_lights_bind_group: wgpu::BindGroup,
+    light_bind_group: wgpu::BindGroup,
 
     #[allow(dead_code)]
     model_bind_group_layout: wgpu::BindGroupLayout,
@@ -151,6 +151,28 @@ impl State {
         for instance in &scene.instances {
             println!("  - Instance '{}' using geometry '{}'", instance.name, instance.geometry_name);
         }
+
+        let texture_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+            label: Some("texture_bind_group_layout"),
+        });
 
         let mut geometry_buffers = HashMap::new();
         for (geom_name, geometry) in &scene.geometries {
@@ -262,20 +284,19 @@ impl State {
                         min_binding_size: None,
                     },
                     count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
                 }
             ],
             label: Some("light_bind_group_layout")
-        });
-
-        let light_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &light_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: light_buffer.as_entire_binding(),
-                }
-            ],
-            label: Some("light_bind_group")
         });
 
         // collect point lights from emissive objects
@@ -289,27 +310,15 @@ impl State {
         let mut point_light_count = 0;
         for instance in &scene.instances {
             if instance.emissive > 0.0 && point_light_count < MAX_POINT_LIGHTS {
-                // get average color of the object's geometry
-                let geom = scene.geometries.get(&instance.geometry_name);
-                let color = if let Some(g) = geom {
-                    if let Some(first_vert) = g.vertices.first() {
-                        first_vert.color
-                    } else {
-                        [1.0, 1.0, 1.0]
-                    }
-                } else {
-                    [1.0, 1.0, 1.0]
-                };
-                
                 point_lights[point_light_count] = PointLight {
                     position: instance.transform.position,
                     intensity: instance.emissive * 5.0,  // scale up for visibility
-                    color,
+                    color: instance.emissive_color,
                     _padding: 0.0,
                 };
                 point_light_count += 1;
                 println!("Point light {} at {:?} with color {:?}, intensity {}", 
-                    point_light_count, instance.transform.position, color, instance.emissive * 5.0);
+                    point_light_count, instance.transform.position, instance.emissive_color, instance.emissive * 5.0);
             }
         }
         
@@ -325,31 +334,19 @@ impl State {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let point_lights_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                }
-            ],
-            label: Some("point_lights_bind_group_layout")
-        });
-
-        let point_lights_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &point_lights_bind_group_layout,
+        let light_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &light_bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
+                    resource: light_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
                     resource: point_lights_buffer.as_entire_binding(),
                 }
             ],
-            label: Some("point_lights_bind_group")
+            label: Some("light_bind_group")
         });
 
         let model_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -405,9 +402,31 @@ impl State {
                 label: Some(&format!("model_bind_group_{}", instance.name)),
             });
 
+            let texture = Texture::from_file(&device, &queue, &format!("assets/{}", instance.material.albedo_texture))
+                .unwrap_or_else(|e| {
+                    eprintln!("Failed to load texture for '{}': {}. Using white.", instance.name, e);
+                    Texture::create_white_texture(&device, &queue)
+                });
+
+            let texture_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &texture_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&texture.view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&texture.sampler),
+                    }
+                ],
+                label: Some(&format!("{} Texture Bind Group", instance.name)),
+            });
+
             instance_data.push(InstanceData {
                 model_buffer,
                 model_bind_group,
+                texture_bind_group,
             });
         }
 
@@ -418,7 +437,7 @@ impl State {
                     &camera_bind_group_layout,
                     &model_bind_group_layout,
                     &light_bind_group_layout,
-                    &point_lights_bind_group_layout,
+                    &texture_bind_group_layout,
                 ],
                 push_constant_ranges: &[],
             }
@@ -463,9 +482,8 @@ impl State {
             camera_buffer,
             camera_bind_group,
             light_buffer,
-            light_bind_group,
             point_lights_buffer,
-            point_lights_bind_group,
+            light_bind_group,
             model_bind_group_layout,
             camera_controller,
             input,
@@ -558,7 +576,6 @@ impl State {
         renderpass.set_pipeline(&self.render_pipeline);
         renderpass.set_bind_group(0, &self.camera_bind_group, &[]);
         renderpass.set_bind_group(2, &self.light_bind_group, &[]);
-        renderpass.set_bind_group(3, &self.point_lights_bind_group, &[]);
 
         // render each object instance
         let mut rendered_count = 0;
@@ -566,6 +583,7 @@ impl State {
             if let Some(buffers) = self.geometry_buffers.get(&instance.geometry_name) {
                 if let Some(instance_data) = self.instance_data.get(idx) {
                     renderpass.set_bind_group(1, &instance_data.model_bind_group, &[]);
+                    renderpass.set_bind_group(3, &instance_data.texture_bind_group, &[]);
                     renderpass.set_vertex_buffer(0, buffers.vertex_buffer.slice(..));
                     renderpass.set_index_buffer(buffers.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
                     renderpass.draw_indexed(0..buffers.num_indices, 0, 0..1);

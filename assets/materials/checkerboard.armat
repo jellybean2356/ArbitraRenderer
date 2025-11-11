@@ -1,0 +1,4 @@
+name Checkerboard
+albedo_texture: textures/checkerboard.png
+roughness: 0.7
+metallic: 0.0

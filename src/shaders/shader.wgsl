@@ -43,8 +43,13 @@ struct PointLights {
     _padding2: f32,
     _padding3: f32,
 };
-@group(3) @binding(0)
+@group(2) @binding(1)
 var<uniform> point_lights: PointLights;
+
+@group(3) @binding(0)
+var t_albedo: texture_2d<f32>;
+@group(3) @binding(1)
+var s_albedo: sampler;
 
 struct VertexInput {
     @location(0) position: vec3<f32>, 
@@ -77,6 +82,8 @@ fn vs_main(input: VertexInput) -> VertexOutput {
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
+    let albedo = textureSample(t_albedo, s_albedo, input.uv).rgb;
+
     let ambient = light.ambient_strength * vec3<f32>(1.0, 1.0, 1.0);
 
     let light_dir = normalize(-light.direction);
@@ -100,9 +107,9 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     let lighting = ambient + directional_lighting + point_lighting;
-    let lit_color = input.color * lighting;
+    let lit_color = albedo * lighting;
 
-    let final_color = lit_color + (input.color * model_uniform.emissive);
+    let final_color = lit_color + (albedo * model_uniform.emissive);
 
     return vec4<f32>(final_color, 1.0);
 }

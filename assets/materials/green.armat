@@ -1,0 +1,4 @@
+name Green
+albedo_texture: textures/green.png
+roughness: 0.3
+metallic: 0.0

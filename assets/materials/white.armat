@@ -1,0 +1,4 @@
+name White
+albedo_texture: textures/white.png
+roughness: 0.5
+metallic: 0.0

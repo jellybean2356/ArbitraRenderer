@@ -1,0 +1,4 @@
+name Red
+albedo_texture: textures/red.png
+roughness: 0.3
+metallic: 0.0
