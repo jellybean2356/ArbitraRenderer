@@ -1,3 +1,3 @@
 [workspace]
-members = ["engine"]
+members = ["render_core"]
 resolver = "2"
