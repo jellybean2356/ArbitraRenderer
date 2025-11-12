@@ -2,7 +2,7 @@ scene_name Sample Scene
 
 light_direction: -0.5 -1.0 -0.3
 light_color: 0.3 0.3 0.4
-light_intensity: 0.2
+light_intensity: 1
 ambient_strength: 0.02
 
 # Ground plane
