@@ -40,9 +40,11 @@ This repository contains a single small rendering engine made in rust. The goal 
 ## Project layout
 
 - `root/`
-  - `Cargo.toml` — crate manifest and dependency list.
-  - `src/` — source files: `main.rs`, `renderer.rs`, `vertex.rs`, `camera.rs`, `input.rs`, `transform.rs`, `object.rs`, `scene.rs`, `material.rs`, `texture.rs`.
-  - `src/shaders/` — WGSL shader files (e.g. `shader.wgsl`).
+  - `Cargo.toml` — workspace manifest.
+  - `render_core/` — main rendering engine crate.
+    - `Cargo.toml` — crate manifest and dependency list.
+    - `src/` — source files: `main.rs`, `renderer.rs`, `vertex.rs`, `camera.rs`, `input.rs`, `transform.rs`, `object.rs`, `scene.rs`, `material.rs`, `texture.rs`.
+    - `src/shaders/` — WGSL shader files (e.g. `shader.wgsl`).
   - `assets/` — asset files for the engine.
     - `models/` — 3D model files in standard OBJ format.
     - `objects/` — object metadata files (`.arobj` format) that reference OBJ models.
@@ -50,7 +52,7 @@ This repository contains a single small rendering engine made in rust. The goal 
     - `materials/` — material definition files (`.armat` format) with texture paths and PBR properties.
     - `textures/` — texture image files (PNG format) referenced by materials.
 
-Open `/src/main.rs` to see the app lifecycle and pipeline setup. Shaders live in `/src/shaders/` and are compiled into the binary via `include_str!(...)` so editing requires recompilation.
+Open `/render_core/src/main.rs` to see the app lifecycle and pipeline setup. Shaders live in `/render_core/src/shaders/` and are compiled into the binary via `include_str!(...)` so editing requires recompilation.
 
 ## How it works (high level)
 
@@ -186,10 +188,10 @@ object
 
 ## Build & run (Windows PowerShell)
 
-**Important**: Always run commands from the directory containing `Cargo.toml` (the repository root), as the application expects to find the `assets/` folder relative to the current working directory.
+**Important**: Always run commands from the workspace root directory (containing the root `Cargo.toml`), as the application expects to find the `assets/` folder relative to the current working directory.
 
 ```powershell
-# Run the application (from repository root)
+# Run the application (from workspace root)
 cargo run
 
 # Enable runtime logging at info level
@@ -206,7 +208,7 @@ Notes
 
 ## Development notes & conventions
 
-- Shaders: add WGSL shader files under `src/shaders/` and reference them using `include_str!("shaders/<file>.wgsl")`.
+- Shaders: add WGSL shader files under `render_core/src/shaders/` and reference them using `include_str!("shaders/<file>.wgsl")`.
 - Vertex layout: keep the Rust `Vertex` struct and its `Vertex::desc()` in sync with the WGSL `@location` attributes.
 - **Models**: Create standard OBJ files in `assets/models/` with positions, normals, and UV coordinates.
 - **Object metadata**: Create `.arobj` files in `assets/objects/` that reference OBJ models (see format specification above).
@@ -214,10 +216,10 @@ Notes
 - **Textures**: Place PNG texture files in `assets/textures/` and reference them from material files.
 - **Scenes**: Create `.arsc` files in `assets/scenes/` to define object instances with transforms, materials, emissive values, and global lighting settings.
 - **Lighting**: Set directional light parameters in the scene file. Objects with `emissive > 0.0` automatically become colored point lights based on their `emissive_color`.
-- **Point lights**: Maximum of 8 point lights per scene (limitation set in `renderer.rs`). The engine uses emissive objects to generate point lights with color and intensity.
+- **Point lights**: Maximum of 8 point lights per scene (limitation set in `render_core/src/renderer.rs`). The engine uses emissive objects to generate point lights with color and intensity.
 - **Bind groups**: The engine uses 4 bind groups (0=Camera, 1=Model, 2=Light, 3=Texture). This is a hardware limitation that requires careful management.
 - Per-instance rendering: each object instance gets its own uniform buffer for the model matrix and emissive value, plus a texture bind group.
-- **Struct padding**: GPU uniform structs must match WGSL layout exactly. Use explicit padding fields when needed (see `LightUniform`, `ModelUniform`, `PointLight` in `renderer.rs`).
+- **Struct padding**: GPU uniform structs must match WGSL layout exactly. Use explicit padding fields when needed (see `LightUniform`, `ModelUniform`, `PointLight` in `render_core/src/renderer.rs`).
 - Async setup: `State::new` uses `pollster::block_on` to keep initialization simple. It's fine for a learning project; for production consider a fully async initialization.
 - Error handling: the code may use `unwrap()` in a few places to keep examples concise. Replace with proper error handling for production use.
 
